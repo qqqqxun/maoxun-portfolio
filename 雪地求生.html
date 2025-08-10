@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雪境求生 - Frost Survival</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #87CEEB;
+            color: #2c3e50;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .game-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar {
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            height: 60px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .status-bar-fill {
+            width: 100px;
+            height: 12px;
+            background: #333;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #555;
+        }
+
+        .fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .hunger { background: #e74c3c; }
+        .temperature { background: #3498db; }
+        .energy { background: #f39c12; }
+
+        .game-world {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(180deg, #b3d9ff 0%, #ffffff 100%);
+            overflow: hidden;
+        }
+
+        .player {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: #e74c3c;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            z-index: 20;
+            left: 200px;
+            top: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .resource {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 15;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 3px solid #fff;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .resource:hover {
+            transform: scale(1.1);
+        }
+
+        .wood { background: #8B4513; }
+        .stone { background: #708090; }
+        .food { background: #32CD32; }
+
+        .building {
+            position: absolute;
+            z-index: 15;
+            border: 3px solid #fff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .campfire {
+            width: 60px;
+            height: 60px;
+            background: #ff6b35;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 0 20px #ff6b35; }
+            100% { box-shadow: 0 0 40px #ff4757; }
+        }
+
+        .shelter {
+            width: 80px;
+            height: 60px;
+            background: #8B4513;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: white;
+        }
+
+        .signal-tower {
+            width: 70px;
+            height: 100px;
+            background: #34495e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: white;
+        }
+
+        .ui-panel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 50;
+        }
+
+        .inventory {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+
+        .inventory-item {
+            background: #34495e;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        .craft-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .craft-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+
+        .craft-btn:hover:not(:disabled) {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .craft-btn:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            z-index: 200;
+            display: none;
+            max-width: 500px;
+            border: 2px solid #3498db;
+        }
+
+        .message h2 {
+            margin-bottom: 15px;
+            color: #3498db;
+            font-size: 24px;
+        }
+
+        .message p {
+            margin-bottom: 20px;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .message button {
+            padding: 12px 24px;
+            border: none;
+            background: #e74c3c;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .message button:hover {
+            background: #c0392b;
+        }
+
+        .time-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #f39c12;
+        }
+
+        .controls {
+            position: fixed;
+            top: 70px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 60;
+        }
+
+        .snow {
+            position: absolute;
+            color: white;
+            font-size: 20px;
+            animation: fall 5s linear infinite;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-20px); opacity: 1; }
+            100% { transform: translateY(100vh); opacity: 0.5; }
+        }
+
+        .day-night {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .night {
+            background: rgba(0, 0, 50, 0.6);
+        }
+
+        .collect-indicator {
+            position: absolute;
+            background: #27ae60;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 14px;
+            font-weight: bold;
+            animation: popup 1s ease-out forwards;
+            z-index: 30;
+            pointer-events: none;
+        }
+
+        @keyframes popup {
+            0% { opacity: 0; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-20px); }
+            100% { opacity: 0; transform: translateY(-40px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="status-bar">
+            <div class="status-item">
+                🍖 饥饿值: 
+                <div class="status-bar-fill">
+                    <div class="fill hunger" id="hunger-bar" style="width: 100%"></div>
+                </div>
+                <span id="hunger-text">100</span>
+            </div>
+            <div class="status-item">
+                🌡️ 体温: 
+                <div class="status-bar-fill">
+                    <div class="fill temperature" id="temperature-bar" style="width: 100%"></div>
+                </div>
+                <span id="temperature-text">100</span>
+            </div>
+            <div class="status-item">
+                ⚡ 体力: 
+                <div class="status-bar-fill">
+                    <div class="fill energy" id="energy-bar" style="width: 100%"></div>
+                </div>
+                <span id="energy-text">100</span>
+            </div>
+            <div class="status-item time-display" id="time-display">
+                第 1 天 - 06:00
+            </div>
+        </div>
+
+        <div class="controls">
+            <strong>控制说明:</strong><br>
+            WASD 或 方向键: 移动<br>
+            点击资源: 采集 (需靠近)<br>
+            靠近建筑: 自动获得效果<br>
+            <strong>目标:</strong> 建造信号塔求救!
+        </div>
+
+        <div class="game-world" id="game-world">
+            <div class="day-night" id="day-night"></div>
+            <div class="player" id="player">🧍</div>
+        </div>
+
+        <div class="ui-panel">
+            <div class="inventory">
+                <div class="inventory-item">🪵 木材: <span id="wood-count">0</span></div>
+                <div class="inventory-item">🪨 石头: <span id="stone-count">0</span></div>
+                <div class="inventory-item">🍄 食物: <span id="food-count">0</span></div>
+            </div>
+            <div class="craft-buttons">
+                <button class="craft-btn" onclick="craft('campfire')" id="campfire-btn">🔥 制作营火 (🪵×3 🪨×1)</button>
+                <button class="craft-btn" onclick="craft('shelter')" id="shelter-btn">🏠 建造庇护所 (🪵×5 🪨×2)</button>
+                <button class="craft-btn" onclick="craft('signal-tower')" id="signal-btn">📡 修建信号塔 (🪵×10 🪨×5)</button>
+                <button class="craft-btn" onclick="consumeFood()" id="eat-btn">🍽️ 吃食物</button>
+            </div>
+        </div>
+
+        <div class="message" id="message">
+            <h2>🚁 雪境求生</h2>
+            <p>你在飞机坠毁后醒来，发现自己被困在冰天雪地中！<br><br>你必须采集资源、建造庇护所，最终修建信号塔发出求救信号才能获救。<br><br>小心维持体温和饥饿值，否则会有生命危险！</p>
+            <button onclick="startGame()">开始求生之旅</button>
+        </div>
+    </div>
+
+    <script>
+        console.log('游戏开始加载...');
+
+        // 游戏状态
+        let gameState = {
+            hunger: 100,
+            temperature: 100,
+            energy: 100,
+            day: 1,
+            hour: 6,
+            resources: { wood: 0, stone: 0, food: 0 },
+            buildings: [],
+            gameRunning: false,
+            playerSpeed: 5
+        };
+
+        // DOM 元素
+        const player = document.getElementById('player');
+        const gameWorld = document.getElementById('game-world');
+        const dayNight = document.getElementById('day-night');
+        const message = document.getElementById('message');
+
+        // 玩家位置
+        let playerPos = { x: 200, y: 200 };
+
+        // 移动控制
+        let keys = {};
+        let moveInterval = null;
+
+        console.log('初始化游戏...');
+
+        // 初始化
+        function init() {
+            console.log('设置初始位置和资源...');
+            
+            // 确保玩家可见
+            player.style.left = playerPos.x + 'px';
+            player.style.top = playerPos.y + 'px';
+            
+            // 立即显示开始消息
+            message.style.display = 'block';
+            
+            // 生成初始资源
+            spawnResources();
+            
+            // 生成雪花
+            createSnow();
+            
+            // 设置键盘控制
+            setupControls();
+            
+            console.log('游戏初始化完成');
+        }
+
+        // 开始游戏
+        function startGame() {
+            console.log('开始游戏');
+            message.style.display = 'none';
+            gameState.gameRunning = true;
+            gameLoop();
+        }
+
+        // 生成资源
+        function spawnResources() {
+            console.log('生成资源...');
+            
+            // 清除现有资源
+            const existingResources = document.querySelectorAll('.resource');
+            existingResources.forEach(r => r.remove());
+            
+            const resourceTypes = ['wood', 'stone', 'food'];
+            const resourceEmojis = { wood: '🪵', stone: '🪨', food: '🍄' };
+            const resourceCounts = { wood: 8, stone: 6, food: 4 };
+            
+            resourceTypes.forEach(type => {
+                for (let i = 0; i < resourceCounts[type]; i++) {
+                    const resource = document.createElement('div');
+                    resource.className = `resource ${type}`;
+                    resource.innerHTML = resourceEmojis[type];
+                    resource.style.left = (Math.random() * (window.innerWidth - 200) + 100) + 'px';
+                    resource.style.top = (Math.random() * (window.innerHeight - 300) + 100) + 'px';
+                    resource.onclick = () => collectResource(resource, type);
+                    gameWorld.appendChild(resource);
+                }
+            });
+            
+            console.log('资源生成完成');
+        }
+
+        // 采集资源
+        function collectResource(element, type) {
+            if (!gameState.gameRunning) return;
+            
+            const rect1 = element.getBoundingClientRect();
+            const rect2 = player.getBoundingClientRect();
+            
+            const distance = Math.sqrt(
+                Math.pow(rect1.left - rect2.left, 2) + 
+                Math.pow(rect1.top - rect2.top, 2)
+            );
+            
+            if (distance < 100) {
+                gameState.resources[type]++;
+                gameState.energy = Math.max(0, gameState.energy - 2);
+                
+                // 显示采集提示
+                showCollectIndicator(rect1.left, rect1.top, `+1 ${type === 'wood' ? '木材' : type === 'stone' ? '石头' : '食物'}`);
+                
+                element.remove();
+                updateUI();
+                
+                // 重新生成资源
+                setTimeout(() => {
+                    if (gameState.gameRunning) {
+                        createResource(type);
+                    }
+                }, 3000);
+            } else {
+                showCollectIndicator(rect1.left, rect1.top, '太远了！');
+            }
+        }
+
+        // 创建单个资源
+        function createResource(type) {
+            const resourceEmojis = { wood: '🪵', stone: '🪨', food: '🍄' };
+            const resource = document.createElement('div');
+            resource.className = `resource ${type}`;
+            resource.innerHTML = resourceEmojis[type];
+            resource.style.left = (Math.random() * (window.innerWidth - 200) + 100) + 'px';
+            resource.style.top = (Math.random() * (window.innerHeight - 300) + 100) + 'px';
+            resource.onclick = () => collectResource(resource, type);
+            gameWorld.appendChild(resource);
+        }
+
+        // 显示采集提示
+        function showCollectIndicator(x, y, text) {
+            const indicator = document.createElement('div');
+            indicator.className = 'collect-indicator';
+            indicator.textContent = text;
+            indicator.style.left = x + 'px';
+            indicator.style.top = y + 'px';
+            document.body.appendChild(indicator);
+            
+            setTimeout(() => {
+                if (indicator.parentNode) {
+                    indicator.remove();
+                }
+            }, 1000);
+        }
+
+        // 生成雪花
+        function createSnow() {
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const snow = document.createElement('div');
+                    snow.className = 'snow';
+                    snow.innerHTML = '❄';
+                    snow.style.left = Math.random() * 100 + '%';
+                    snow.style.animationDuration = (Math.random() * 3 + 3) + 's';
+                    snow.style.animationDelay = Math.random() * 2 + 's';
+                    gameWorld.appendChild(snow);
+                    
+                    setTimeout(() => {
+                        if (snow.parentNode) {
+                            snow.remove();
+                        }
+                    }, 8000);
+                }, i * 100);
+            }
+        }
+
+        // 持续生成雪花
+        setInterval(createSnow, 5000);
+
+        // 设置控制
+        function setupControls() {
+            document.addEventListener('keydown', (e) => {
+                if (!gameState.gameRunning) return;
+                
+                const key = e.key.toLowerCase();
+                if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) {
+                    e.preventDefault();
+                    keys[key] = true;
+                    
+                    if (!moveInterval) {
+                        moveInterval = setInterval(movePlayer, 16);
+                    }
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                const key = e.key.toLowerCase();
+                keys[key] = false;
+                
+                // 如果没有按键被按下，停止移动
+                if (!Object.values(keys).some(pressed => pressed)) {
+                    if (moveInterval) {
+                        clearInterval(moveInterval);
+                        moveInterval = null;
+                    }
+                }
+            });
+        }
+
+        // 移动玩家
+        function movePlayer() {
+            if (!gameState.gameRunning) return;
+            
+            let moved = false;
+            const speed = gameState.playerSpeed;
+            
+            if (keys['w'] || keys['arrowup']) {
+                if (playerPos.y > 70) {
+                    playerPos.y -= speed;
+                    moved = true;
+                }
+            }
+            if (keys['s'] || keys['arrowdown']) {
+                if (playerPos.y < window.innerHeight - 200) {
+                    playerPos.y += speed;
+                    moved = true;
+                }
+            }
+            if (keys['a'] || keys['arrowleft']) {
+                if (playerPos.x > 10) {
+                    playerPos.x -= speed;
+                    moved = true;
+                }
+            }
+            if (keys['d'] || keys['arrowright']) {
+                if (playerPos.x < window.innerWidth - 70) {
+                    playerPos.x += speed;
+                    moved = true;
+                }
+            }
+
+            if (moved) {
+                player.style.left = playerPos.x + 'px';
+                player.style.top = playerPos.y + 'px';
+                gameState.energy = Math.max(0, gameState.energy - 0.1);
+            }
+        }
+
+        // 制作系统
+        function craft(item) {
+            if (!gameState.gameRunning) return;
+            
+            const recipes = {
+                campfire: { wood: 3, stone: 1 },
+                shelter: { wood: 5, stone: 2 },
+                'signal-tower': { wood: 10, stone: 5 }
+            };
+
+            const recipe = recipes[item];
+            if (!recipe) return;
+
+            // 检查材料
+            for (let resource in recipe) {
+                if (gameState.resources[resource] < recipe[resource]) {
+                    showMessage('材料不足！', `需要更多资源才能制作。`);
+                    return;
+                }
+            }
+
+            // 消耗材料
+            for (let resource in recipe) {
+                gameState.resources[resource] -= recipe[resource];
+            }
+
+            // 建造
+            const building = document.createElement('div');
+            building.className = `building ${item}`;
+            
+            const buildingEmojis = { campfire: '🔥', shelter: '🏠', 'signal-tower': '📡' };
+            building.innerHTML = buildingEmojis[item];
+            
+            building.style.left = (playerPos.x + 60) + 'px';
+            building.style.top = (playerPos.y + 20) + 'px';
+            gameWorld.appendChild(building);
+
+            gameState.buildings.push({ 
+                type: item, 
+                x: playerPos.x + 60, 
+                y: playerPos.y + 20, 
+                element: building 
+            });
+
+            if (item === 'signal-tower') {
+                setTimeout(() => {
+                    showMessage('🎉 胜利！', '你成功修建了信号塔并发出了求救信号！救援队正在赶来的路上！恭喜通关！');
+                    gameState.gameRunning = false;
+                }, 1000);
+            }
+
+            updateUI();
+        }
+
+        // 吃食物
+        function consumeFood() {
+            if (!gameState.gameRunning || gameState.resources.food <= 0) return;
+            
+            gameState.resources.food--;
+            gameState.hunger = Math.min(100, gameState.hunger + 30);
+            showCollectIndicator(playerPos.x, playerPos.y - 20, '+30 饥饿值');
+            updateUI();
+        }
+
+        // 显示消息
+        function showMessage(title, text) {
+            message.innerHTML = `
+                <h2>${title}</h2>
+                <p>${text}</p>
+                <button onclick="hideMessage()">继续</button>
+            `;
+            message.style.display = 'block';
+        }
+
+        // 隐藏消息
+        function hideMessage() {
+            message.style.display = 'none';
+        }
+
+        // 更新UI
+        function updateUI() {
+            document.getElementById('hunger-bar').style.width = gameState.hunger + '%';
+            document.getElementById('temperature-bar').style.width = gameState.temperature + '%';
+            document.getElementById('energy-bar').style.width = gameState.energy + '%';
+            
+            document.getElementById('hunger-text').textContent = Math.floor(gameState.hunger);
+            document.getElementById('temperature-text').textContent = Math.floor(gameState.temperature);
+            document.getElementById('energy-text').textContent = Math.floor(gameState.energy);
+
+            const timeString = `第 ${gameState.day} 天 - ${String(Math.floor(gameState.hour)).padStart(2, '0')}:${String(Math.floor((gameState.hour % 1) * 60)).padStart(2, '0')}`;
+            document.getElementById('time-display').textContent = timeString;
+
+            document.getElementById('wood-count').textContent = gameState.resources.wood;
+            document.getElementById('stone-count').textContent = gameState.resources.stone;
+            document.getElementById('food-count').textContent = gameState.resources.food;
+
+            updateCraftButtons();
+
+            if (gameState.hour >= 18 || gameState.hour < 6) {
+                dayNight.classList.add('night');
+            } else {
+                dayNight.classList.remove('night');
+            }
+        }
+
+        // 更新制作按钮
+        function updateCraftButtons() {
+            const buttons = {
+                'campfire-btn': { wood: 3, stone: 1 },
+                'shelter-btn': { wood: 5, stone: 2 },
+                'signal-btn': { wood: 10, stone: 5 }
+            };
+
+            for (let btnId in buttons) {
+                const btn = document.getElementById(btnId);
+                const recipe = buttons[btnId];
+                let canCraft = true;
+
+                for (let resource in recipe) {
+                    if (gameState.resources[resource] < recipe[resource]) {
+                        canCraft = false;
+                        break;
+                    }
+                }
+
+                btn.disabled = !canCraft;
+            }
+
+            document.getElementById('eat-btn').disabled = gameState.resources.food === 0;
+        }
+
+        // 检查建筑效果
+        function checkBuildingEffects() {
+            for (let building of gameState.buildings) {
+                const distance = Math.sqrt(
+                    Math.pow(playerPos.x - building.x, 2) + 
+                    Math.pow(playerPos.y - building.y, 2)
+                );
+
+                if (distance < 100) {
+                    if (building.type === 'campfire') {
+                        gameState.temperature = Math.min(100, gameState.temperature + 1);
+                    } else if (building.type === 'shelter') {
+                        gameState.temperature = Math.min(100, gameState.temperature + 0.5);
+                        gameState.energy = Math.min(100, gameState.energy + 0.3);
+                    }
+                }
+            }
+        }
+
+        // 主游戏循环
+        function gameLoop() {
+            if (!gameState.gameRunning) return;
+
+            // 时间推进
+            gameState.hour += 0.1;
+            if (gameState.hour >= 24) {
+                gameState.hour = 0;
+                gameState.day++;
+            }
+
+            // 状态衰减
+            gameState.hunger = Math.max(0, gameState.hunger - 0.05);
+            
+            let tempDecay = (gameState.hour >= 18 || gameState.hour < 6) ? 0.2 : 0.05;
+            gameState.temperature = Math.max(0, gameState.temperature - tempDecay);
+            
+            if (gameState.energy < 100) {
+                gameState.energy = Math.min(100, gameState.energy + 0.02);
+            }
+
+            checkBuildingEffects();
+
+            // 检查失败条件
+            if (gameState.hunger <= 0 || gameState.temperature <= 0) {
+                let reason = gameState.hunger <= 0 ? '饥饿' : '严寒';
+                showMessage('💀 游戏结束', `你死于${reason}！需要更好地管理资源和保持温暖。`);
+                gameState.gameRunning = false;
+                return;
+            }
+
+            if (gameState.day > 15) {
+                showMessage('⏰ 游戏结束', '15天过去了，救援队没有找到你。你在雪地中永远迷失了...');
+                gameState.gameRunning = false;
+                return;
+            }
+
+            updateUI();
+            setTimeout(gameLoop, 100);
+        }
+
+        // 启动游戏
+        console.log('启动游戏');
+        init();
+    </script>
+</body>
+</html>

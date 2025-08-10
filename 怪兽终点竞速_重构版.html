@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>怪兽终点竞速 - 重构版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .game-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 背景效果 */
+        .background-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* 开始屏幕 */
+        .start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(30,30,60,0.95));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .game-title {
+            font-size: 56px;
+            font-weight: bold;
+            color: #ff6b6b;
+            text-shadow: 0 0 30px #ff6b6b;
+            margin-bottom: 20px;
+            animation: titlePulse 3s ease-in-out infinite;
+        }
+
+        .game-subtitle {
+            font-size: 20px;
+            color: #ccc;
+            margin-bottom: 40px;
+            opacity: 0.8;
+        }
+
+        @keyframes titlePulse {
+            0%, 100% { text-shadow: 0 0 30px #ff6b6b; }
+            50% { text-shadow: 0 0 50px #ff6b6b, 0 0 70px #ff0000; }
+        }
+
+        /* 难度选择 */
+        .difficulty-selector {
+            margin: 30px 0;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .difficulty-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            min-width: 120px;
+            backdrop-filter: blur(5px);
+        }
+
+        .difficulty-card:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .difficulty-card.selected {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.2);
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+        }
+
+        .difficulty-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .difficulty-desc {
+            font-size: 12px;
+            color: #ccc;
+            line-height: 1.4;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            margin: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(145deg, #ff6b6b, #ff5252);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(145deg, #ff5252, #ff1744);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+        }
+
+        /* 游戏HUD */
+        .game-hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(30,30,30,0.8));
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 100;
+            border-bottom: 2px solid rgba(255, 107, 107, 0.3);
+        }
+
+        .hud-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .hud-item.time-warning {
+            background: rgba(255, 100, 100, 0.8);
+            border-color: #ff4444;
+            animation: timeWarning 1s ease-in-out infinite alternate;
+        }
+        
+        .hud-item.time-critical {
+            background: rgba(255, 0, 0, 0.9);
+            border-color: #ff0000;
+            animation: timeCritical 0.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes timeWarning {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+        
+        @keyframes timeCritical {
+            0% { transform: scale(1); box-shadow: 0 0 10px rgba(255, 0, 0, 0.5); }
+            100% { transform: scale(1.1); box-shadow: 0 0 20px rgba(255, 0, 0, 1); }
+        }
+
+        /* 怪兽 */
+        .monster {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 80px;
+            width: 180px;
+            height: 160px;
+            z-index: 50;
+            display: none;
+        }
+
+        .monster-body {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #8B4513, #A0522D);
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            border: 4px solid #654321;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 80px;
+            animation: monsterIdle 3s ease-in-out infinite;
+        }
+
+        .monster.turning .monster-body {
+            background: linear-gradient(145deg, #8B0000, #DC143C);
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.8);
+            animation: monsterTurn 1s ease-in-out;
+        }
+
+        .monster.looking .monster-body {
+            background: linear-gradient(145deg, #FF4500, #FF6347);
+            box-shadow: 0 0 80px rgba(255, 69, 0, 1);
+            animation: monsterLook 0.3s ease-in-out infinite alternate;
+        }
+
+        @keyframes monsterIdle {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.02); }
+        }
+
+        @keyframes monsterTurn {
+            0% { transform: rotateY(0deg); }
+            50% { transform: rotateY(90deg) scale(1.1); }
+            100% { transform: rotateY(180deg); }
+        }
+
+        @keyframes monsterLook {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+
+        /* 玩家 */
+        .player {
+            position: absolute;
+            width: 50px;
+            height: 60px;
+            transition: all 0.2s ease;
+            z-index: 40;
+            animation: robotWalk 1.5s ease-in-out infinite;
+        }
+        
+        /* 玩家身体 */
+        .player::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 35px;
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            border: 2px solid #2c5282;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* 玩家头部（显示器） */
+        .player::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 28px;
+            height: 28px;
+            background: #1a1a1a;
+            border: 3px solid #333;
+            border-radius: 3px;
+            box-shadow: 
+                inset 0 0 8px rgba(0, 255, 100, 0.3),
+                0 0 12px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* 玩家表情 */
+        .player-face {
+            position: absolute;
+            top: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #00ff66;
+            text-shadow: 0 0 4px #00ff66;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            z-index: 1;
+        }
+        
+        /* 玩家手臂 */
+        .player-arm-left, .player-arm-right {
+            position: absolute;
+            width: 12px;
+            height: 3px;
+            background: #4a90e2;
+            border: 1px solid #2c5282;
+            border-radius: 2px;
+            top: 40px;
+        }
+        
+        .player-arm-left {
+            left: 8px;
+            transform-origin: right center;
+        }
+        
+        .player-arm-right {
+            right: 8px;
+            transform-origin: left center;
+        }
+        
+        /* 玩家腿部 */
+        .player-leg-left, .player-leg-right {
+            position: absolute;
+            width: 6px;
+            height: 12px;
+            background: #4a90e2;
+            border: 1px solid #2c5282;
+            border-radius: 1px;
+            bottom: -12px;
+        }
+        
+        .player-leg-left {
+            left: 16px;
+            transform-origin: top center;
+        }
+        
+        .player-leg-right {
+            right: 16px;
+            transform-origin: top center;
+        }
+        
+        /* 机器人走路动画 */
+        @keyframes robotWalk {
+            0%, 100% { 
+                transform: translateY(0) rotateZ(0deg);
+            }
+            25% { 
+                transform: translateY(-2px) rotateZ(-1deg);
+            }
+            50% { 
+                transform: translateY(0) rotateZ(0deg);
+            }
+            75% { 
+                transform: translateY(-2px) rotateZ(1deg);
+            }
+        }
+        
+        /* 手臂摆动动画 */
+        .player .player-arm-left {
+            animation: armSwingLeft 1.5s ease-in-out infinite;
+        }
+        
+        .player .player-arm-right {
+            animation: armSwingRight 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes armSwingLeft {
+            0%, 100% { transform: rotateZ(0deg); }
+            50% { transform: rotateZ(-20deg); }
+        }
+        
+        @keyframes armSwingRight {
+            0%, 100% { transform: rotateZ(0deg); }
+            50% { transform: rotateZ(20deg); }
+        }
+        
+        /* 腿部摆动动画 */
+        .player .player-leg-left {
+            animation: legSwingLeft 1.5s ease-in-out infinite;
+        }
+        
+        .player .player-leg-right {
+            animation: legSwingRight 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes legSwingLeft {
+            0%, 100% { transform: rotateZ(0deg); }
+            50% { transform: rotateZ(15deg); }
+        }
+        
+        @keyframes legSwingRight {
+            0%, 100% { transform: rotateZ(0deg); }
+            50% { transform: rotateZ(-15deg); }
+        }
+
+        .player.dead {
+            opacity: 0.6;
+            animation: none !important;
+        }
+        
+        .player.dead::before {
+            background: linear-gradient(135deg, #666, #444) !important;
+            border-color: #333 !important;
+        }
+        
+        .player.dead::after {
+            background: #000 !important;
+            box-shadow: none !important;
+        }
+        
+        .player.dead .player-face {
+            color: #ff4444 !important;
+            text-shadow: 0 0 4px #ff4444 !important;
+        }
+        
+        .player.dead .player-arm-left,
+        .player.dead .player-arm-right,
+        .player.dead .player-leg-left,
+        .player.dead .player-leg-right {
+            background: #666 !important;
+            border-color: #333 !important;
+            animation: none !important;
+        }
+
+        /* 赛道 */
+        .race-area {
+            position: absolute;
+            top: 240px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: calc(100vh - 320px);
+            z-index: 20;
+            display: none;
+        }
+
+        .track {
+            position: absolute;
+            width: 120px;
+            height: 100%;
+            border-left: 3px dashed rgba(255, 255, 255, 0.3);
+            border-right: 3px dashed rgba(255, 255, 255, 0.3);
+            background: linear-gradient(to bottom, 
+                rgba(255, 255, 255, 0.1) 0%, 
+                transparent 5%, 
+                transparent 95%, 
+                rgba(255, 255, 255, 0.1) 100%);
+        }
+
+        .track:nth-child(1) { left: 0; }
+        .track:nth-child(2) { left: 120px; }
+        .track:nth-child(3) { left: 240px; }
+        .track:nth-child(4) { left: 360px; }
+        .track:nth-child(5) { left: 480px; }
+
+        /* 终点线和起点线 */
+        .finish-line, .start-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background-size: 40px 100%;
+            z-index: 30;
+            display: none;
+        }
+
+        .finish-line {
+            top: 240px;
+            background: linear-gradient(to right, #ff0000, #fff, #ff0000, #fff, #ff0000);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+        }
+
+        .start-line {
+            bottom: 80px;
+            background: linear-gradient(to right, #00ff00, #fff, #00ff00, #fff, #00ff00);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+        }
+
+        /* 警告信息 */
+        .warning {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 0, 0, 0.95);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 150;
+            animation: blink 0.5s infinite;
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.7; }
+        }
+
+        /* 激光效果 */
+        .laser {
+            position: absolute;
+            width: 8px;
+            background: linear-gradient(to bottom, #ff0000, #ff6600, #ffff00);
+            box-shadow: 0 0 30px #ff0000;
+            z-index: 60;
+            border-radius: 4px;
+        }
+
+        /* 死亡屏幕 */
+        .death-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(139, 0, 0, 0.95), rgba(75, 0, 0, 0.95));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1500;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* 胜利屏幕 */
+        .victory-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0, 100, 0, 0.95), rgba(0, 150, 50, 0.95));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1500;
+            backdrop-filter: blur(10px);
+        }
+
+        .death-title {
+            font-size: 72px;
+            font-weight: bold;
+            color: #ff4444;
+            text-shadow: 0 0 40px #ff0000;
+            margin-bottom: 30px;
+        }
+
+        .death-message {
+            font-size: 24px;
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+        
+        .victory-title {
+            font-size: 72px;
+            font-weight: bold;
+            color: #44ff44;
+            text-shadow: 0 0 40px #00ff00;
+            margin-bottom: 30px;
+            animation: victoryPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes victoryPulse {
+            0%, 100% { 
+                text-shadow: 0 0 40px #00ff00; 
+                transform: scale(1); 
+            }
+            50% { 
+                text-shadow: 0 0 60px #00ff00, 0 0 80px #44ff44; 
+                transform: scale(1.05); 
+            }
+        }
+
+        .victory-message {
+            font-size: 24px;
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+        
+        .victory-stats {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            color: white;
+            text-align: center;
+            border: 2px solid rgba(68, 255, 68, 0.3);
+        }
+        
+        .victory-stats h3 {
+            color: #44ff44;
+            margin-bottom: 20px;
+        }
+        
+        /* 超时屏幕 */
+        .timeout-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255, 140, 0, 0.95), rgba(255, 100, 0, 0.95));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1500;
+            backdrop-filter: blur(10px);
+        }
+        
+        .timeout-title {
+            font-size: 72px;
+            font-weight: bold;
+            color: #ffaa00;
+            text-shadow: 0 0 40px #ff8800;
+            margin-bottom: 30px;
+            animation: timeoutPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes timeoutPulse {
+            0%, 100% { 
+                text-shadow: 0 0 40px #ff8800; 
+                transform: scale(1); 
+            }
+            50% { 
+                text-shadow: 0 0 60px #ff8800, 0 0 80px #ffaa00; 
+                transform: scale(1.05); 
+            }
+        }
+
+        .timeout-message {
+            font-size: 24px;
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+        
+        .timeout-stats {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            color: white;
+            text-align: center;
+            border: 2px solid rgba(255, 170, 0, 0.3);
+        }
+        
+        .timeout-stats h3 {
+            color: #ffaa00;
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container" id="gameContainer">
+        <!-- 背景层 -->
+        <div class="background-layer"></div>
+
+        <!-- 开始屏幕 -->
+        <div class="start-screen" id="startScreen">
+            <div class="game-title">怪兽终点竞速</div>
+            <div class="game-subtitle">Monster Racing - 重构版</div>
+            
+            <div class="difficulty-selector">
+                <div class="difficulty-card selected" data-difficulty="easy">
+                    <div class="difficulty-name">🟢 简单</div>
+                    <div class="difficulty-desc">巡逻5秒·凝视1秒</div>
+                </div>
+                <div class="difficulty-card" data-difficulty="normal">
+                    <div class="difficulty-name">🟡 普通</div>
+                    <div class="difficulty-desc">巡逻4秒·凝视2秒</div>
+                </div>
+                <div class="difficulty-card" data-difficulty="hard">
+                    <div class="difficulty-name">🟠 困难</div>
+                    <div class="difficulty-desc">巡逻3秒·凝视3秒</div>
+                </div>
+                <div class="difficulty-card" data-difficulty="expert">
+                    <div class="difficulty-name">🔴 专家</div>
+                    <div class="difficulty-desc">巡逻2秒·凝视4秒</div>
+                </div>
+            </div>
+            
+            <div>
+                <button class="btn btn-primary" id="startBtn">🚀 开始游戏</button>
+            </div>
+        </div>
+
+        <!-- 死亡屏幕 -->
+        <div class="death-screen hidden" id="deathScreen">
+            <div class="death-title">💀 游戏结束</div>
+            <div class="death-message" id="deathMessage">
+                你被怪兽发现了！
+            </div>
+            <div>
+                <button class="btn btn-primary" id="restartBtn">🔄 重新开始</button>
+            </div>
+        </div>
+        
+        <!-- 胜利屏幕 -->
+        <div class="victory-screen hidden" id="victoryScreen">
+            <div class="victory-title">🏆 胜利！</div>
+            <div class="victory-message" id="victoryMessage">
+                恭喜！你成功打败了怪兽！<br>
+                准备好迎接更大的挑战了吗？
+            </div>
+            <div class="victory-stats" id="victoryStats">
+                <h3>📊 本局统计</h3>
+                <div class="stat-row">
+                    <span>最终分数:</span>
+                    <span id="victoryScore">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>存活时间:</span>
+                    <span id="victorySurvivalTime">0s</span>
+                </div>
+                <div class="stat-row">
+                    <span>当前难度:</span>
+                    <span id="victoryDifficulty">简单</span>
+                </div>
+                <div class="stat-row">
+                    <span>下一难度:</span>
+                    <span id="nextDifficulty">普通</span>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-primary" id="nextLevelBtn">🚀 挑战更高难度 (N键)</button>
+                <button class="btn btn-secondary" id="exitGameBtn">🏠 退出游戏 (ESC键)</button>
+            </div>
+        </div>
+        
+        <!-- 超时失败屏幕 -->
+        <div class="timeout-screen hidden" id="timeoutScreen">
+            <div class="timeout-title">⏰ 时间到！</div>
+            <div class="timeout-message">
+                你没能在1分钟内到达终点！<br>
+                时间管理很重要，再试一次吧！
+            </div>
+            <div class="timeout-stats">
+                <h3>📊 本局统计</h3>
+                <div class="stat-row">
+                    <span>最终分数:</span>
+                    <span id="timeoutScore">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>已用时间:</span>
+                    <span>60s</span>
+                </div>
+                <div class="stat-row">
+                    <span>当前难度:</span>
+                    <span id="timeoutDifficulty">简单</span>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-primary" id="retryBtn">🔄 重来一局 (R键)</button>
+                <button class="btn btn-secondary" id="quitBtn">🏠 退出游戏 (ESC键)</button>
+            </div>
+        </div>
+
+        <!-- 游戏界面 -->
+        <div class="game-hud" id="gameHUD">
+            <div class="hud-item">怪兽状态: <span id="monsterStatus">巡逻中</span></div>
+            <div class="hud-item">分数: <span id="currentScore">0</span></div>
+            <div class="hud-item" id="timeDisplay">时间: <span id="timeLeft">60</span>s</div>
+        </div>
+
+        <div class="monster" id="monster">
+            <div class="monster-body" id="monsterBody">👹</div>
+        </div>
+
+        <div class="race-area" id="raceArea">
+            <div class="track"></div>
+            <div class="track"></div>
+            <div class="track"></div>
+            <div class="track"></div>
+            <div class="track"></div>
+        </div>
+
+        <div class="finish-line" id="finishLine"></div>
+        <div class="start-line" id="startLine"></div>
+        <div class="warning" id="warning">怪兽正在凝视！不要移动！</div>
+    </div>
+
+    <script>
+        // ====== 游戏状态 ======
+        const gameState = {
+            current: 'menu', // menu, playing, dead, timeout
+            difficulty: 'easy',
+            score: 0,
+            startTime: 0,
+            timeLimit: 60, // 60秒时间限制
+            timeLeft: 60,
+            gameTimer: null
+        };
+
+        // ====== 音效系统 ======
+        const audioSystem = {
+            context: null,
+            enabled: true,
+            backgroundMusic: null,
+            musicGain: null,
+            
+            init() {
+                try {
+                    this.context = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log('🔊 音效系统初始化完成');
+                    this.setupBackgroundMusic();
+                } catch (e) {
+                    console.log('⚠️ 音效系统不支持');
+                    this.enabled = false;
+                }
+            },
+
+            setupBackgroundMusic() {
+                if (!this.enabled || !this.context) return;
+                
+                // 创建主增益节点
+                this.musicGain = this.context.createGain();
+                this.musicGain.connect(this.context.destination);
+                this.musicGain.gain.setValueAtTime(0.1, this.context.currentTime); // 背景音乐音量
+            },
+
+            playBackgroundMusic() {
+                if (!this.enabled || !this.context || this.backgroundMusic) return;
+                
+                this.createMelody();
+            },
+
+            createMelody() {
+                // 创建类似羊了个羊的轻松背景音乐
+                const melody = [
+                    {note: 523, duration: 0.5}, // C5
+                    {note: 587, duration: 0.5}, // D5
+                    {note: 659, duration: 0.5}, // E5
+                    {note: 698, duration: 0.5}, // F5
+                    {note: 784, duration: 0.5}, // G5
+                    {note: 698, duration: 0.5}, // F5
+                    {note: 659, duration: 0.5}, // E5
+                    {note: 587, duration: 0.5}, // D5
+                    {note: 523, duration: 1.0}, // C5
+                ];
+
+                let time = this.context.currentTime;
+                
+                melody.forEach((note, index) => {
+                    const osc = this.context.createOscillator();
+                    const gain = this.context.createGain();
+                    
+                    osc.connect(gain);
+                    gain.connect(this.musicGain);
+                    
+                    osc.frequency.setValueAtTime(note.note, time);
+                    osc.type = 'sine';
+                    
+                    // 柔和的音符
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(0.3, time + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, time + note.duration);
+                    
+                    osc.start(time);
+                    osc.stop(time + note.duration);
+                    
+                    time += note.duration;
+                });
+
+                // 循环播放
+                setTimeout(() => {
+                    if (this.backgroundMusic && this.context && gameState.current === 'playing') {
+                        this.createMelody();
+                    }
+                }, time * 1000 - this.context.currentTime * 1000 + 1000);
+            },
+
+            stopBackgroundMusic() {
+                this.backgroundMusic = null;
+            },
+
+            playTone(frequency, duration, volume = 0.1, type = 'square') {
+                if (!this.enabled || !this.context) return;
+                
+                try {
+                    const oscillator = this.context.createOscillator();
+                    const gainNode = this.context.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(this.context.destination);
+                    
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = type;
+                    
+                    gainNode.gain.setValueAtTime(volume, this.context.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + duration);
+                    
+                    oscillator.start(this.context.currentTime);
+                    oscillator.stop(this.context.currentTime + duration);
+                } catch (e) {
+                    console.log('音效播放失败:', e);
+                }
+            },
+
+            // 具体音效 - 羊了个羊风格
+            moveStep() {
+                // 清脆的移动音效，类似羊了个羊的点击音
+                this.playTone(800, 0.1, 0.08, 'sine');
+                setTimeout(() => this.playTone(1000, 0.05, 0.05, 'sine'), 50);
+            },
+
+            monsterTurn() {
+                // 警告音效 - 更有趣的音调
+                this.playTone(200, 0.2, 0.15, 'triangle');
+                setTimeout(() => this.playTone(150, 0.3, 0.12, 'triangle'), 200);
+            },
+
+            monsterLook() {
+                // 危险音效 - 更紧张
+                this.playTone(1200, 0.1, 0.2, 'sawtooth');
+                setTimeout(() => this.playTone(1400, 0.1, 0.15, 'sawtooth'), 100);
+            },
+
+            playerDeath() {
+                // 失败音效 - 类似羊了个羊的失败音
+                this.playTone(400, 0.3, 0.2, 'triangle');
+                setTimeout(() => this.playTone(300, 0.3, 0.18, 'triangle'), 150);
+                setTimeout(() => this.playTone(200, 0.5, 0.15, 'triangle'), 300);
+            },
+
+            reachFinish() {
+                // 成功音效 - 清脆愉快
+                this.playTone(659, 0.2, 0.15, 'sine'); // E5
+                setTimeout(() => this.playTone(784, 0.2, 0.15, 'sine'), 100); // G5
+                setTimeout(() => this.playTone(1047, 0.3, 0.12, 'sine'), 200); // C6
+            },
+
+            victory() {
+                // 胜利音效 - 欢快的旋律
+                const victoryMelody = [
+                    {note: 523, delay: 0},   // C5
+                    {note: 659, delay: 150}, // E5
+                    {note: 784, delay: 300}, // G5
+                    {note: 1047, delay: 450}, // C6
+                    {note: 1319, delay: 600}, // E6
+                ];
+                
+                victoryMelody.forEach(({note, delay}) => {
+                    setTimeout(() => {
+                        this.playTone(note, 0.4, 0.2, 'sine');
+                    }, delay);
+                });
+            },
+
+            laser() {
+                // 激光音效 - 科幻感
+                this.playTone(1500, 0.05, 0.3, 'sawtooth');
+                setTimeout(() => this.playTone(1200, 0.1, 0.25, 'sawtooth'), 50);
+            },
+
+            // 新增音效
+            buttonClick() {
+                // 按钮点击音效
+                this.playTone(1000, 0.1, 0.1, 'sine');
+            },
+
+            gameStart() {
+                // 游戏开始音效
+                this.playTone(523, 0.2, 0.15, 'sine');
+                setTimeout(() => this.playTone(659, 0.2, 0.15, 'sine'), 100);
+                setTimeout(() => this.playTone(784, 0.3, 0.12, 'sine'), 200);
+            },
+
+            stopAll() {
+                if (this.context) {
+                    try {
+                        this.context.close();
+                        this.context = new (window.AudioContext || window.webkitAudioContext)();
+                    } catch (e) {
+                        console.log('重置音频上下文失败:', e);
+                    }
+                }
+            }
+        };
+
+        // ====== 难度配置 ======
+        const difficulties = {
+            easy: { patrolTime: 5000, turnTime: 1000, lookTime: 1000 },
+            normal: { patrolTime: 4000, turnTime: 1000, lookTime: 2000 },
+            hard: { patrolTime: 3000, turnTime: 1000, lookTime: 3000 },
+            expert: { patrolTime: 2000, turnTime: 1000, lookTime: 4000 }
+        };
+        
+        const difficultyOrder = ['easy', 'normal', 'hard', 'expert'];
+        const difficultyNames = {
+            easy: '简单',
+            normal: '普通', 
+            hard: '困难',
+            expert: '专家'
+        };
+
+        // ====== 怪兽系统 ======
+        const monster = {
+            state: 'patrolling', // patrolling, turning, looking
+            timer: null,
+            
+            start() {
+                console.log('🎮 怪兽AI启动');
+                this.state = 'patrolling';
+                this.scheduleNextAction();
+            },
+
+            stop() {
+                console.log('🛑 怪兽AI停止');
+                if (this.timer) {
+                    clearTimeout(this.timer);
+                    this.timer = null;
+                }
+                this.state = 'patrolling';
+                this.updateUI();
+            },
+
+            scheduleNextAction() {
+                if (gameState.current !== 'playing') return;
+                
+                const config = difficulties[gameState.difficulty];
+                const delay = config.patrolTime;
+                
+                console.log(`👹 怪兽巡逻 ${delay/1000} 秒`);
+                this.updateUI();
+                
+                this.timer = setTimeout(() => {
+                    if (gameState.current === 'playing') {
+                        this.startTurning();
+                    }
+                }, delay);
+            },
+
+            startTurning() {
+                if (gameState.current !== 'playing') return;
+                
+                console.log('🔄 怪兽开始回头');
+                this.state = 'turning';
+                this.updateUI();
+                audioSystem.monsterTurn(); // 播放回头音效
+                
+                const config = difficulties[gameState.difficulty];
+                this.timer = setTimeout(() => {
+                    if (gameState.current === 'playing') {
+                        this.startLooking();
+                    }
+                }, config.turnTime);
+            },
+
+            startLooking() {
+                if (gameState.current !== 'playing') return;
+                
+                console.log('👁️ 怪兽开始凝视');
+                this.state = 'looking';
+                this.updateUI();
+                audioSystem.monsterLook(); // 播放凝视音效
+                
+                // 检查玩家是否在终点线等待
+                if (player.reachedFinish) {
+                    console.log('⚔️ 玩家在终点线挑战怪兽！');
+                    setTimeout(() => {
+                        if (gameState.current === 'playing' && player.reachedFinish) {
+                            player.defeatMonster();
+                        }
+                    }, 500); // 等待0.5秒后检查胜利
+                }
+                
+                const config = difficulties[gameState.difficulty];
+                this.timer = setTimeout(() => {
+                    if (gameState.current === 'playing') {
+                        this.state = 'patrolling';
+                        this.scheduleNextAction();
+                    }
+                }, config.lookTime);
+            },
+
+            updateUI() {
+                const monsterElement = document.getElementById('monster');
+                const bodyElement = document.getElementById('monsterBody');
+                const statusElement = document.getElementById('monsterStatus');
+                const warningElement = document.getElementById('warning');
+
+                // 重置所有状态
+                monsterElement.className = 'monster';
+                warningElement.style.display = 'none';
+
+                switch (this.state) {
+                    case 'patrolling':
+                        bodyElement.textContent = '👹';
+                        statusElement.textContent = '巡逻中';
+                        // 玩家恢复正常表情
+                        if (player.faceElement && !player.isDead) {
+                            player.faceElement.textContent = '^_^';
+                        }
+                        break;
+                    case 'turning':
+                        monsterElement.classList.add('turning');
+                        bodyElement.textContent = '😈';
+                        statusElement.textContent = '正在回头...';
+                        warningElement.style.display = 'block';
+                        warningElement.textContent = '怪兽正在回头！准备停止移动！';
+                        break;
+                    case 'looking':
+                        monsterElement.classList.add('looking');
+                        bodyElement.textContent = '👁️';
+                        statusElement.textContent = '正在凝视！';
+                        warningElement.style.display = 'block';
+                        warningElement.textContent = '怪兽正在凝视！不要移动！';
+                        // 玩家紧张表情
+                        if (player.faceElement && !player.isDead) {
+                            player.faceElement.textContent = 'O_O';
+                        }
+                        break;
+                }
+            }
+        };
+
+        // ====== 玩家系统 ======
+        const player = {
+            x: 2, // 跑道位置 (0-4)
+            y: 50, // 位置 (0-600)
+            element: null,
+            isDead: false,
+            reachedFinish: false, // 是否到达终点线
+
+            create() {
+                // 确保先清理任何现有元素
+                if (this.element) {
+                    this.remove();
+                }
+                
+                // 重置玩家状态
+                this.x = 2;
+                this.y = 50;
+                this.isDead = false;
+                this.reachedFinish = false;
+                
+                this.element = document.createElement('div');
+                this.element.className = 'player';
+                
+                // 创建表情显示
+                this.faceElement = document.createElement('div');
+                this.faceElement.className = 'player-face';
+                this.faceElement.textContent = '^_^';
+                this.element.appendChild(this.faceElement);
+                
+                // 创建四肢
+                this.armLeft = document.createElement('div');
+                this.armLeft.className = 'player-arm-left';
+                this.element.appendChild(this.armLeft);
+                
+                this.armRight = document.createElement('div');
+                this.armRight.className = 'player-arm-right';
+                this.element.appendChild(this.armRight);
+                
+                this.legLeft = document.createElement('div');
+                this.legLeft.className = 'player-leg-left';
+                this.element.appendChild(this.legLeft);
+                
+                this.legRight = document.createElement('div');
+                this.legRight.className = 'player-leg-right';
+                this.element.appendChild(this.legRight);
+                
+                document.getElementById('gameContainer').appendChild(this.element);
+                this.updatePosition();
+                
+                console.log('✅ 玩家创建完成，位置:', this.x, this.y);
+            },
+
+            updatePosition() {
+                if (!this.element) return;
+                
+                const raceArea = document.getElementById('raceArea').getBoundingClientRect();
+                const x = raceArea.left + this.x * 120 + 60 - 25; // 调整中心点
+                const y = raceArea.bottom - this.y - 30; // 调整底部对齐
+                
+                this.element.style.left = x + 'px';
+                this.element.style.top = y + 'px';
+            },
+
+            move(direction) {
+                if (this.isDead || gameState.current !== 'playing') return;
+
+                // 检查怪兽凝视
+                if (monster.state === 'looking') {
+                    console.log('💀 玩家在凝视时移动，触发死亡');
+                    this.die();
+                    return;
+                }
+
+                // 正常移动
+                switch (direction) {
+                    case 'up':
+                        // 允许玩家移动到真正的终点线
+                        const raceHeight = window.innerHeight - 320;
+                        const maxY = raceHeight - 40; // 可以稍微超过终点线
+                        this.y = Math.min(maxY, this.y + 2);
+                        gameState.score += 1;
+                        audioSystem.moveStep(); // 播放移动音效
+                        break;
+                    case 'down':
+                        this.y = Math.max(0, this.y - 2);
+                        audioSystem.moveStep(); // 播放移动音效
+                        break;
+                    case 'left':
+                        this.x = Math.max(0, this.x - 1);
+                        audioSystem.moveStep(); // 播放移动音效
+                        break;
+                    case 'right':
+                        this.x = Math.min(4, this.x + 1);
+                        audioSystem.moveStep(); // 播放移动音效
+                        break;
+                }
+
+                this.updatePosition();
+                this.updateScore();
+
+                // 检查是否到达真正的终点线（接近怪兽位置）
+                // 赛道高度 = 视窗高度 - 320px，玩家需要到达接近顶部
+                const raceHeight = window.innerHeight - 320;
+                const finishLineY = raceHeight - 60; // 距离赛道顶部60px处为真正的终点
+                
+                if (this.y >= finishLineY && !this.reachedFinish) {
+                    this.reachedFinish = true;
+                    console.log('🏁 玩家到达真正的终点线！Y坐标:', this.y, '终点线:', finishLineY);
+                    audioSystem.reachFinish(); // 播放到达终点音效
+                    this.checkVictory();
+                }
+            },
+
+            checkVictory() {
+                // 到达终点线后，需要在怪兽凝视状态下保持不动才能获胜
+                if (this.reachedFinish) {
+                    document.getElementById('warning').style.display = 'block';
+                    document.getElementById('warning').textContent = '🏁 到达真正的终点线！现在面对怪兽，等待凝视时保持不动！';
+                    document.getElementById('warning').style.background = 'rgba(0, 255, 0, 0.9)';
+                    
+                    // 玩家开心表情
+                    if (this.faceElement && !this.isDead) {
+                        this.faceElement.textContent = '^o^';
+                    }
+                    
+                    // 检查当前怪兽状态
+                    if (monster.state === 'looking') {
+                        this.defeatMonster();
+                    }
+                }
+            },
+
+            defeatMonster() {
+                if (this.reachedFinish && monster.state === 'looking') {
+                    console.log('🎉 玩家打败了怪兽！');
+                    gameState.score += 1000; // 打败怪兽奖励分数
+                    
+                    // 播放胜利音效
+                    audioSystem.victory();
+                    
+                    // 显示胜利效果
+                    document.getElementById('warning').textContent = '🎉 你打败了怪兽！胜利！';
+                    document.getElementById('warning').style.background = 'rgba(255, 215, 0, 0.9)';
+                    
+                    setTimeout(() => {
+                        endGame('victory');
+                    }, 1000);
+                }
+            },
+
+            die() {
+                console.log('💀 玩家死亡');
+                this.isDead = true;
+                this.element.classList.add('dead');
+                if (this.faceElement) {
+                    this.faceElement.textContent = 'X_X';
+                }
+                
+                // 播放死亡音效
+                audioSystem.playerDeath();
+                
+                // 创建激光效果
+                this.createLaser();
+                
+                setTimeout(() => {
+                    showDeathScreen();
+                }, 500);
+            },
+
+            createLaser() {
+                const laser = document.createElement('div');
+                laser.className = 'laser';
+                
+                const monsterPos = { x: window.innerWidth / 2, y: 160 };
+                const playerPos = { 
+                    x: this.element.offsetLeft + 20, 
+                    y: this.element.offsetTop + 20 
+                };
+                
+                const deltaX = playerPos.x - monsterPos.x;
+                const deltaY = playerPos.y - monsterPos.y;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+                
+                laser.style.left = monsterPos.x + 'px';
+                laser.style.top = monsterPos.y + 'px';
+                laser.style.height = distance + 'px';
+                laser.style.transformOrigin = 'top center';
+                laser.style.transform = `rotate(${angle + 90}deg)`;
+                
+                document.getElementById('gameContainer').appendChild(laser);
+                
+                // 播放激光音效
+                audioSystem.laser();
+                
+                setTimeout(() => {
+                    if (laser.parentNode) {
+                        laser.parentNode.removeChild(laser);
+                    }
+                }, 300);
+            },
+
+            updateScore() {
+                document.getElementById('currentScore').textContent = gameState.score;
+            },
+
+            remove() {
+                if (this.element && this.element.parentNode) {
+                    console.log('🗑️ 移除玩家元素');
+                    this.element.parentNode.removeChild(this.element);
+                }
+                // 清理所有引用
+                this.element = null;
+                this.faceElement = null;
+                this.armLeft = null;
+                this.armRight = null;
+                this.legLeft = null;
+                this.legRight = null;
+            },
+
+            reset() {
+                this.x = 2;
+                this.y = 50;
+                this.isDead = false;
+                this.reachedFinish = false; // 重置终点线状态
+                if (this.element) {
+                    this.element.className = 'player';
+                    if (this.faceElement) {
+                        this.faceElement.textContent = '^_^';
+                    }
+                    this.updatePosition();
+                }
+            }
+        };
+
+        // ====== 游戏控制 ======
+        function startGame() {
+            console.log('🚀 开始游戏');
+            gameState.current = 'playing';
+            gameState.score = 0;
+            gameState.startTime = Date.now();
+            
+            // 重置计时器
+            gameState.timeLeft = gameState.timeLimit;
+            updateTimeDisplay();
+
+            // 初始化音效系统
+            audioSystem.init();
+            
+            // 播放游戏开始音效和背景音乐
+            audioSystem.gameStart();
+            setTimeout(() => {
+                audioSystem.backgroundMusic = true; // 标记背景音乐开始
+                audioSystem.playBackgroundMusic();
+            }, 500);
+
+            // 清理现有玩家（防止重复创建）
+            if (player.element) {
+                console.log('清理现有玩家元素');
+                player.remove();
+            }
+
+            // 显示游戏界面
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('deathScreen').classList.add('hidden');
+            document.getElementById('victoryScreen').classList.add('hidden');
+            document.getElementById('timeoutScreen').classList.add('hidden');
+            document.getElementById('gameHUD').style.display = 'flex';
+            document.getElementById('monster').style.display = 'block';
+            document.getElementById('raceArea').style.display = 'block';
+            document.getElementById('finishLine').style.display = 'block';
+            document.getElementById('startLine').style.display = 'block';
+
+            // 创建玩家
+            player.create();
+            
+            // 启动怪兽AI
+            monster.start();
+            
+            // 启动游戏计时器
+            startGameTimer();
+        }
+
+        // 启动游戏计时器
+        function startGameTimer() {
+            console.log('⏰ 启动游戏计时器');
+            // 清理现有计时器
+            if (gameState.gameTimer) {
+                clearInterval(gameState.gameTimer);
+            }
+            
+            gameState.gameTimer = setInterval(() => {
+                if (gameState.current !== 'playing') {
+                    clearInterval(gameState.gameTimer);
+                    return;
+                }
+                
+                gameState.timeLeft--;
+                updateTimeDisplay();
+                
+                // 时间到了
+                if (gameState.timeLeft <= 0) {
+                    console.log('⏰ 时间到！游戏失败');
+                    clearInterval(gameState.gameTimer);
+                    showTimeoutScreen();
+                }
+            }, 1000);
+        }
+        
+        // 更新时间显示
+        function updateTimeDisplay() {
+            const timeElement = document.getElementById('timeLeft');
+            const timeDisplay = document.getElementById('timeDisplay');
+            
+            if (timeElement) {
+                timeElement.textContent = gameState.timeLeft;
+            }
+            
+            if (timeDisplay) {
+                // 移除之前的警告样式
+                timeDisplay.classList.remove('time-warning', 'time-critical');
+                
+                // 根据剩余时间添加警告样式
+                if (gameState.timeLeft <= 10) {
+                    timeDisplay.classList.add('time-critical');
+                } else if (gameState.timeLeft <= 20) {
+                    timeDisplay.classList.add('time-warning');
+                }
+            }
+        }
+
+        function endGame(reason) {
+            console.log('🎮 游戏结束:', reason);
+            gameState.current = 'ended';
+            
+            // 停止计时器
+            if (gameState.gameTimer) {
+                clearInterval(gameState.gameTimer);
+                gameState.gameTimer = null;
+            }
+            
+            // 停止怪兽AI
+            monster.stop();
+            
+            // 停止背景音乐和所有音效
+            audioSystem.stopBackgroundMusic();
+            audioSystem.stopAll();
+            
+            if (reason === 'victory') {
+                showVictoryScreen();
+            }
+        }
+
+        function showVictoryScreen() {
+            console.log('🏆 显示胜利屏幕');
+            gameState.current = 'victory';
+            
+            // 隐藏游戏界面
+            document.getElementById('gameHUD').style.display = 'none';
+            document.getElementById('warning').style.display = 'none';
+            
+            // 计算统计数据
+            const survivalTime = Math.floor((Date.now() - gameState.startTime) / 1000);
+            const finalScore = gameState.score + 1000; // 胜利奖励
+            
+            // 更新胜利屏幕数据
+            document.getElementById('victoryScore').textContent = finalScore;
+            document.getElementById('victorySurvivalTime').textContent = survivalTime + 's';
+            document.getElementById('victoryDifficulty').textContent = difficultyNames[gameState.difficulty];
+            
+            // 计算下一难度
+            const currentIndex = difficultyOrder.indexOf(gameState.difficulty);
+            const nextDifficulty = currentIndex < difficultyOrder.length - 1 ? 
+                difficultyOrder[currentIndex + 1] : null;
+            
+            // 存储下一难度到全局变量供按钮使用
+            window.nextDifficultyLevel = nextDifficulty;
+            
+            const nextLevelBtn = document.getElementById('nextLevelBtn');
+            if (nextDifficulty) {
+                document.getElementById('nextDifficulty').textContent = difficultyNames[nextDifficulty];
+                nextLevelBtn.style.display = 'inline-block';
+            } else {
+                document.getElementById('nextDifficulty').textContent = '已达到最高难度！';
+                nextLevelBtn.style.display = 'none';
+            }
+            
+            // 显示胜利屏幕
+            document.getElementById('victoryScreen').classList.remove('hidden');
+            console.log('胜利屏幕应该已显示');
+        }
+
+        function showTimeoutScreen() {
+            console.log('⏰ 显示超时屏幕');
+            gameState.current = 'timeout';
+            
+            // 停止怪兽AI
+            monster.stop();
+            
+            // 停止背景音乐和所有音效
+            audioSystem.stopBackgroundMusic();
+            audioSystem.stopAll();
+            
+            // 隐藏游戏界面
+            document.getElementById('gameHUD').style.display = 'none';
+            document.getElementById('warning').style.display = 'none';
+            
+            // 更新超时屏幕数据
+            document.getElementById('timeoutScore').textContent = gameState.score;
+            document.getElementById('timeoutDifficulty').textContent = difficultyNames[gameState.difficulty];
+            
+            // 显示超时屏幕
+            document.getElementById('timeoutScreen').classList.remove('hidden');
+            console.log('超时屏幕应该已显示');
+        }
+
+        function showDeathScreen() {
+            console.log('💀 显示死亡屏幕');
+            gameState.current = 'dead';
+            
+            // 停止怪兽AI
+            monster.stop();
+            
+            // 停止背景音乐和所有音效
+            audioSystem.stopBackgroundMusic();
+            audioSystem.stopAll();
+            
+            // 隐藏游戏界面
+            document.getElementById('gameHUD').style.display = 'none';
+            document.getElementById('warning').style.display = 'none';
+            
+            // 显示死亡屏幕
+            document.getElementById('deathScreen').classList.remove('hidden');
+            console.log('死亡屏幕应该已显示');
+        }
+
+        function challengeNextLevel(nextDifficulty) {
+            console.log('🚀 挑战更高难度:', nextDifficulty);
+            
+            // 更新难度设置
+            gameState.difficulty = nextDifficulty;
+            
+            // 更新UI难度选择
+            document.querySelectorAll('.difficulty-card').forEach(card => {
+                card.classList.remove('selected');
+                if (card.dataset.difficulty === nextDifficulty) {
+                    card.classList.add('selected');
+                }
+            });
+            
+            // 隐藏胜利屏幕
+            document.getElementById('victoryScreen').classList.add('hidden');
+            
+            // 完全清理和重置玩家
+            player.remove(); // 先移除现有玩家元素
+            player.x = 2;     // 重置位置
+            player.y = 50;
+            player.isDead = false;
+            player.reachedFinish = false;
+            
+            // 直接开始新游戏
+            startGame();
+        }
+
+        function retryGame() {
+            console.log('🔄 重来一局（超时后）');
+            // 完全清理玩家
+            player.remove();
+            document.getElementById('timeoutScreen').classList.add('hidden');
+            startGame();
+        }
+
+        function restartGame() {
+            console.log('🔄 重新开始游戏');
+            // 完全清理玩家
+            player.remove();
+            document.getElementById('deathScreen').classList.add('hidden');
+            startGame();
+        }
+
+        function returnToMenu() {
+            console.log('🏠 返回主菜单');
+            gameState.current = 'menu';
+            
+            // 停止怪兽AI
+            monster.stop();
+            
+            // 停止背景音乐和所有音效
+            audioSystem.stopBackgroundMusic();
+            audioSystem.stopAll();
+            
+            // 清理玩家
+            player.remove();
+            
+            // 隐藏所有屏幕
+            document.getElementById('gameHUD').style.display = 'none';
+            document.getElementById('monster').style.display = 'none';
+            document.getElementById('raceArea').style.display = 'none';
+            document.getElementById('finishLine').style.display = 'none';
+            document.getElementById('startLine').style.display = 'none';
+            document.getElementById('warning').style.display = 'none';
+            document.getElementById('deathScreen').classList.add('hidden');
+            document.getElementById('victoryScreen').classList.add('hidden');
+            document.getElementById('timeoutScreen').classList.add('hidden');
+            
+            // 显示开始屏幕
+            document.getElementById('startScreen').classList.remove('hidden');
+        }
+
+        // ====== 事件绑定 ======
+        function bindEvents() {
+            // 难度选择
+            document.querySelectorAll('.difficulty-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    document.querySelectorAll('.difficulty-card').forEach(c => c.classList.remove('selected'));
+                    this.classList.add('selected');
+                    gameState.difficulty = this.dataset.difficulty;
+                    console.log('难度设置为:', gameState.difficulty);
+                });
+            });
+
+            // 按钮事件
+            document.getElementById('startBtn').addEventListener('click', () => {
+                // 初始化音频上下文（需要用户交互）
+                if (!audioSystem.context) {
+                    audioSystem.init();
+                }
+                audioSystem.buttonClick();
+                startGame();
+            });
+            document.getElementById('restartBtn').addEventListener('click', () => {
+                if (!audioSystem.context) {
+                    audioSystem.init();
+                }
+                audioSystem.buttonClick();
+                restartGame();
+            });
+            document.getElementById('exitGameBtn').addEventListener('click', () => {
+                if (!audioSystem.context) {
+                    audioSystem.init();
+                }
+                audioSystem.buttonClick();
+                returnToMenu();
+            });
+            document.getElementById('nextLevelBtn').addEventListener('click', () => {
+                if (!audioSystem.context) {
+                    audioSystem.init();
+                }
+                audioSystem.buttonClick();
+                if (window.nextDifficultyLevel) {
+                    challengeNextLevel(window.nextDifficultyLevel);
+                }
+            });
+            document.getElementById('retryBtn').addEventListener('click', () => {
+                if (!audioSystem.context) {
+                    audioSystem.init();
+                }
+                audioSystem.buttonClick();
+                retryGame();
+            });
+            document.getElementById('quitBtn').addEventListener('click', () => {
+                if (!audioSystem.context) {
+                    audioSystem.init();
+                }
+                audioSystem.buttonClick();
+                returnToMenu();
+            });
+
+            // 键盘控制
+            document.addEventListener('keydown', function(e) {
+                if (gameState.current === 'dead' && e.key.toLowerCase() === 'r') {
+                    restartGame();
+                    return;
+                }
+                
+                if (gameState.current === 'timeout') {
+                    if (e.key.toLowerCase() === 'r') {
+                        // R键重来一局
+                        retryGame();
+                        return;
+                    } else if (e.key === 'Escape') {
+                        // ESC键退出游戏
+                        returnToMenu();
+                        return;
+                    }
+                }
+                
+                if (gameState.current === 'victory') {
+                    if (e.key.toLowerCase() === 'n') {
+                        // N键挑战下一难度
+                        const nextLevelBtn = document.getElementById('nextLevelBtn');
+                        if (nextLevelBtn.style.display !== 'none') {
+                            nextLevelBtn.click();
+                        }
+                        return;
+                    } else if (e.key === 'Escape') {
+                        // ESC键退出游戏
+                        returnToMenu();
+                        return;
+                    }
+                }
+                
+                if (gameState.current !== 'playing') return;
+                
+                switch (e.key) {
+                    case 'ArrowUp':
+                        player.move('up');
+                        break;
+                    case 'ArrowDown':
+                        player.move('down');
+                        break;
+                    case 'ArrowLeft':
+                        player.move('left');
+                        break;
+                    case 'ArrowRight':
+                        player.move('right');
+                        break;
+                    case 'r':
+                    case 'R':
+                        restartGame();
+                        break;
+                    case 'Escape':
+                        returnToMenu();
+                        break;
+                }
+            });
+        }
+
+        // ====== 初始化 ======
+        window.addEventListener('load', function() {
+            console.log('🎮 游戏初始化完成');
+            bindEvents();
+        });
+    </script>
+</body>
+</html>
